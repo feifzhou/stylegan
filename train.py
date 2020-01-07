@@ -13,6 +13,15 @@ from dnnlib import EasyDict
 
 import config
 from metrics import metric_base
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--data', default='', help='train/test data dir under datasets/')
+parser.add_argument('--ncolor', type=int, default=-1, help='color channels (1,3 or default -1 from dataset')
+parser.add_argument('--resolution', type=int, default=256, help='resolution, must be 2**n')
+parser.add_argument('--mirror_augment', action='store_true', help='Enables mirror augment')
+parser.add_argument('--max_label_size', default='0', help='max_label_size (default 0 to disable, or full from data, or integer') 
+args = parser.parse_args()
+import os
 
 #----------------------------------------------------------------------------
 # Official training configs for StyleGAN, targeted mainly for FFHQ.
@@ -28,25 +37,33 @@ if 1:
     D_loss        = EasyDict(func_name='training.loss.D_logistic_simplegp', r1_gamma=10.0) # Options for discriminator loss.
     dataset       = EasyDict()                                                             # Options for load_dataset().
     sched         = EasyDict()                                                             # Options for TrainingSchedule.
-    grid          = EasyDict(size='4k', layout='random')                                   # Options for setup_snapshot_image_grid().
+    grid          = EasyDict(size='1080p', layout='random')                                   # Options for setup_snapshot_image_grid().
     metrics       = [metric_base.fid50k]                                                   # Options for MetricGroup.
     submit_config = dnnlib.SubmitConfig()                                                  # Options for dnnlib.submit_run().
-    tf_config     = {'rnd.np_random_seed': 1000}                                           # Options for tflib.init_tf().
+    tf_config     = {'rnd.np_random_seed': 1020}                                           # Options for tflib.init_tf().
 
     # Dataset.
-    desc += '-ffhq';     dataset = EasyDict(tfrecord_dir='ffhq');                 train.mirror_augment = True
+    #desc += '-ffhq';     dataset = EasyDict(tfrecord_dir='ffhq');                 train.mirror_augment = True
     #desc += '-ffhq512';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=512); train.mirror_augment = True
     #desc += '-ffhq256';  dataset = EasyDict(tfrecord_dir='ffhq', resolution=256); train.mirror_augment = True
     #desc += '-celebahq'; dataset = EasyDict(tfrecord_dir='celebahq');             train.mirror_augment = True
     #desc += '-bedroom';  dataset = EasyDict(tfrecord_dir='lsun-bedroom-full');    train.mirror_augment = False
     #desc += '-car';      dataset = EasyDict(tfrecord_dir='lsun-car-512x384');     train.mirror_augment = False
     #desc += '-cat';      dataset = EasyDict(tfrecord_dir='lsun-cat-full');        train.mirror_augment = False
-
+    desc += '-'+args.data
+    dataset = EasyDict(tfrecord_dir=args.data, resolution=args.resolution)
+    train.mirror_augment = args.mirrow_augment
+    dataset.max_label_size = args.max_label_size
+    try:
+        dataset.max_label_size = int(dataset.max_label_size)
+    except:
+        pass
+    
     # Number of GPUs.
     #desc += '-1gpu'; submit_config.num_gpus = 1; sched.minibatch_base = 4; sched.minibatch_dict = {4: 128, 8: 128, 16: 128, 32: 64, 64: 32, 128: 16, 256: 8, 512: 4}
     #desc += '-2gpu'; submit_config.num_gpus = 2; sched.minibatch_base = 8; sched.minibatch_dict = {4: 256, 8: 256, 16: 128, 32: 64, 64: 32, 128: 16, 256: 8}
-    #desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_base = 16; sched.minibatch_dict = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 16}
-    desc += '-8gpu'; submit_config.num_gpus = 8; sched.minibatch_base = 32; sched.minibatch_dict = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32}
+    desc += '-4gpu'; submit_config.num_gpus = 4; sched.minibatch_base = 32; sched.minibatch_dict = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32, 128: 16}
+    #desc += '-8gpu'; submit_config.num_gpus = 8; sched.minibatch_base = 32; sched.minibatch_dict = {4: 512, 8: 256, 16: 128, 32: 64, 64: 32}
 
     # Default options.
     train.total_kimg = 25000
@@ -95,7 +112,7 @@ if 0:
     grid          = EasyDict(size='1080p', layout='random')                        # Options for setup_snapshot_image_grid().
     metrics       = [metric_base.fid50k]                                           # Options for MetricGroup.
     submit_config = dnnlib.SubmitConfig()                                          # Options for dnnlib.submit_run().
-    tf_config     = {'rnd.np_random_seed': 1000}                                   # Options for tflib.init_tf().
+    tf_config     = {'rnd.np_random_seed': 1020}                                   # Options for tflib.init_tf().
 
     # Dataset (choose one).
     desc += '-celebahq';            dataset = EasyDict(tfrecord_dir='celebahq'); train.mirror_augment = True
@@ -175,6 +192,7 @@ if 0:
 # Calls the function indicated by 'train' using the selected options.
 
 def main():
+    print('debug args', train, dataset, sched, grid , metrics, tf_config, submit_config, config, desc)
     kwargs = EasyDict(train)
     kwargs.update(G_args=G, D_args=D, G_opt_args=G_opt, D_opt_args=D_opt, G_loss_args=G_loss, D_loss_args=D_loss)
     kwargs.update(dataset_args=dataset, sched_args=sched, grid_args=grid, metric_arg_list=metrics, tf_config=tf_config)

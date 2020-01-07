@@ -526,6 +526,49 @@ def create_from_images(tfrecord_dir, image_dir, shuffle):
                 img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_image(img)
 
+
+def create_from_images_subdirlabels(tfrecord_dir, image_dir, shuffle, nchannel):
+    print('Loading images from "%s"' % image_dir)
+    subdirs = sorted(glob.glob(os.path.join(image_dir, '*/')))
+    subdirs = list(map(os.path.dirname, subdirs))
+    if len(subdirs) == 0:
+        error('No input subdirs found')
+
+    image_filenames = glob.glob(os.path.join(image_dir, '*/*'))
+    img = np.asarray(PIL.Image.open(image_filenames[0]))
+    resolution = img.shape[0]
+    channels = img.shape[2] if img.ndim == 3 else 1
+    out_ch = channels if nchannel==-1 else nchannel
+    if img.shape[1] != resolution:
+        error('Input images must have the same width and height')
+    if resolution != 2 ** int(np.floor(np.log2(resolution))):
+        error('Input image resolution must be a power-of-two')
+    if channels not in [1, 3]:
+        error('Input images must be stored as RGB or grayscale')
+
+    rgb2g = np.array([[0.3, 0.59, 0.11]])
+    with TFRecordExporter(tfrecord_dir, len(image_filenames)) as tfr:
+        onehot = np.zeros((len(image_filenames), len(subdirs)), dtype=np.float32)
+        order = tfr.choose_shuffled_order() if shuffle else np.arange(len(image_filenames))
+        for idx in range(order.size):
+            img = np.asarray(PIL.Image.open(image_filenames[order[idx]]))
+            if channels == 1:
+                img = img[np.newaxis, :, :] # HW => CHW
+            else:
+                img = img.transpose([2, 0, 1]) # HWC => CHW
+            if out_ch != channels:
+                if out_ch==3 and channels==1:
+                    img = np.repeat(img, 3, axis=0)
+                elif out_ch==1 and channels==3:
+                    img = np.dot(rgb2g, img)
+                else:
+                    raise "cannot handle conversion of chnnals: in %d out %d"%(channels, out_ch)
+            tfr.add_image(img)
+            onehot[idx, subdirs.index(os.path.dirname(image_filenames[order[idx]]))] = 1.0
+        tfr.add_labels(onehot)
+
+
+
 #----------------------------------------------------------------------------
 
 def create_from_hdf5(tfrecord_dir, hdf5_filename, shuffle):
@@ -625,6 +668,13 @@ def execute_cmdline(argv):
     p.add_argument(     'tfrecord_dir',     help='New dataset directory to be created')
     p.add_argument(     'image_dir',        help='Directory containing the images')
     p.add_argument(     '--shuffle',        help='Randomize image order (default: 1)', type=int, default=1)
+
+    p = add_command(    'create_from_images_subdirlabels', 'Create dataset from a directory full of subdirs for image classes (e.g. dir/class0 dir/class1 ...).',
+                                            'create_from_images datasets/mydataset myimagedir')
+    p.add_argument(     'tfrecord_dir',     help='New dataset directory to be created')
+    p.add_argument(     'image_dir',        help='Directory containing the subdirs')
+    p.add_argument(     '--shuffle',        help='Randomize image order (default: 1)', type=int, default=1)
+    p.add_argument(     '--nchannel',       help='no. channel(default: -1 no change)', type=int, default=-1)
 
     p = add_command(    'create_from_hdf5', 'Create dataset from legacy HDF5 archive.',
                                             'create_from_hdf5 datasets/celebahq ~/downloads/celeba-hq-1024x1024.h5')

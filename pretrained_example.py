@@ -20,8 +20,9 @@ def main():
     tflib.init_tf()
 
     # Load pre-trained network.
-    url = 'https://drive.google.com/uc?id=1MEGjdvVpUsu1jB4zrXZN7Y4kBBOzizDQ' # karras2019stylegan-ffhq-1024x1024.pkl
-    with dnnlib.util.open_url(url, cache_dir=config.cache_dir) as f:
+    #url = 'https://drive.google.com/uc?id=1MEGjdvVpUsu1jB4zrXZN7Y4kBBOzizDQ' # karras2019stylegan-ffhq-1024x1024.pkl
+    #with dnnlib.util.open_url(url, cache_dir=config.cache_dir) as f:
+    with open('network-snapshot-006005.pkl', 'rb') as f:
         _G, _D, Gs = pickle.load(f)
         # _G = Instantaneous snapshot of the generator. Mainly useful for resuming a previous training run.
         # _D = Instantaneous snapshot of the discriminator. Mainly useful for resuming a previous training run.
@@ -30,9 +31,10 @@ def main():
     # Print network details.
     Gs.print_layers()
 
+    Nimages= 10
     # Pick latent vector.
     rnd = np.random.RandomState(5)
-    latents = rnd.randn(1, Gs.input_shape[1])
+    latents = rnd.randn(Nimages, Gs.input_shape[1])
 
     # Generate image.
     fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -40,8 +42,12 @@ def main():
 
     # Save image.
     os.makedirs(config.result_dir, exist_ok=True)
-    png_filename = os.path.join(config.result_dir, 'example.png')
-    PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
+    for i in range(Nimages):
+        png_filename = os.path.join(config.result_dir, '%04d_example.png'%(i))
+        if images[0].shape[-1]==3:
+            PIL.Image.fromarray(images[i], 'RGB').save(png_filename)
+        else:
+            PIL.Image.fromarray(images[i,:,:,0], 'L').save(png_filename)
 
 if __name__ == "__main__":
     main()

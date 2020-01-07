@@ -25,7 +25,8 @@ Notes:
 from collections import OrderedDict
 import numpy as np
 import tensorflow as tf
-from tensorboard import summary as summary_lib
+#from tensorboard import summary as summary_lib
+from tensorboard.summary.v1 import custom_scalar_pb
 from tensorboard.plugins.custom_scalar import layout_pb2
 
 from . import tfutil
@@ -164,7 +165,7 @@ def finalize_autosummaries() -> None:
             margin = layout_pb2.MarginChartContent(series=series)
             charts.append(layout_pb2.Chart(title=chart_name, margin=margin))
         categories.append(layout_pb2.Category(title=cat_name, chart=charts))
-    layout = summary_lib.custom_scalar_pb(layout_pb2.Layout(category=categories))
+    layout = custom_scalar_pb(layout_pb2.Layout(category=categories))
     return layout
 
 def save_summaries(file_writer, global_step=None):
