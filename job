@@ -7,8 +7,17 @@
 # dataset creation
 # python dataset_tool.py  create_from_images_subdirlabels datasets/heattreatment  ~/lassen-space/ml_src/imageScripts/heattreatment128_10um/labeled/ --nchannels 3
 
+
+# color training
 jsrun -r 1 python train.py --data heattreatment \
   --ncolor 3\
+  --resolution 128\
+  --max_label_size full
+
+exit
+# gray scale
+jsrun -r 1 python train.py --data heat_gray \
+  --ncolor 1 --metrics='fid50k' \
   --resolution 128\
   --max_label_size full
 

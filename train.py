@@ -20,8 +20,13 @@ parser.add_argument('--ncolor', type=int, default=-1, help='color channels (1,3 
 parser.add_argument('--resolution', type=int, default=256, help='resolution, must be 2**n')
 parser.add_argument('--mirror_augment', action='store_true', help='Enables mirror augment')
 parser.add_argument('--max_label_size', default='0', help='max_label_size (default 0 to disable, or full from data, or integer') 
+parser.add_argument('--metrics', default='fid50k', help='metrics')
+parser.add_argument('--ckpt', default='', help='load model checkpoint to continue')
+parser.add_argument('--lod_init', type=int, default=8, help='initial LOD')
 args = parser.parse_args()
-import os
+def get_metrics(arg):
+    d = {'fid50k': metric_base.fid50k}
+    return [d[k] for k in filter(bool, arg.split(','))]
 
 #----------------------------------------------------------------------------
 # Official training configs for StyleGAN, targeted mainly for FFHQ.
@@ -37,8 +42,8 @@ if 1:
     D_loss        = EasyDict(func_name='training.loss.D_logistic_simplegp', r1_gamma=10.0) # Options for discriminator loss.
     dataset       = EasyDict()                                                             # Options for load_dataset().
     sched         = EasyDict()                                                             # Options for TrainingSchedule.
-    grid          = EasyDict(size='1080p', layout='random')                                   # Options for setup_snapshot_image_grid().
-    metrics       = [metric_base.fid50k]                                                   # Options for MetricGroup.
+    grid          = EasyDict(size='1080p', layout='random')                                # Options for setup_snapshot_image_grid().
+    metrics       = get_metrics(args.metrics)                                              # Options for MetricGroup.
     submit_config = dnnlib.SubmitConfig()                                                  # Options for dnnlib.submit_run().
     tf_config     = {'rnd.np_random_seed': 1020}                                           # Options for tflib.init_tf().
 
@@ -52,7 +57,7 @@ if 1:
     #desc += '-cat';      dataset = EasyDict(tfrecord_dir='lsun-cat-full');        train.mirror_augment = False
     desc += '-'+args.data
     dataset = EasyDict(tfrecord_dir=args.data, resolution=args.resolution)
-    train.mirror_augment = args.mirrow_augment
+    train.mirror_augment = args.mirror_augment
     dataset.max_label_size = args.max_label_size
     try:
         dataset.max_label_size = int(dataset.max_label_size)
@@ -67,7 +72,7 @@ if 1:
 
     # Default options.
     train.total_kimg = 25000
-    sched.lod_initial_resolution = 8
+    sched.lod_initial_resolution = args.lod_init
     sched.G_lrate_dict = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
     sched.D_lrate_dict = EasyDict(sched.G_lrate_dict)
 
@@ -194,6 +199,8 @@ if 0:
 def main():
     print('debug args', train, dataset, sched, grid , metrics, tf_config, submit_config, config, desc)
     kwargs = EasyDict(train)
+    if args.ckpt:
+        kwargs.update(resume_run_id=args.ckpt)
     kwargs.update(G_args=G, D_args=D, G_opt_args=G_opt, D_opt_args=D_opt, G_loss_args=G_loss, D_loss_args=D_loss)
     kwargs.update(dataset_args=dataset, sched_args=sched, grid_args=grid, metric_arg_list=metrics, tf_config=tf_config)
     kwargs.submit_config = copy.deepcopy(submit_config)

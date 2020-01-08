@@ -17,12 +17,27 @@ from metrics import metric_base
 from training import misc
 
 #----------------------------------------------------------------------------
+def _rgb(image):
+    if image.shape[1] == 3:
+        return image
+    if image is np.ndarray:
+        return np.repeat(image, 3, axis=1)
+    else:
+        return tf.tile(image, [1,3,1,1])
 
 class FID(metric_base.MetricBase):
     def __init__(self, num_images, minibatch_per_gpu, **kwargs):
         super().__init__(**kwargs)
         self.num_images = num_images
         self.minibatch_per_gpu = minibatch_per_gpu
+
+#    def _rgb(image):
+#        if image.shape[1] == 3:
+#            return image
+#        if image is np.ndarray:
+#            return np.repeat(image, 3, axis=1)
+#        else:
+#            return tf.tile(image, [1,3,1,1])
 
     def _evaluate(self, Gs, num_gpus):
         minibatch_size = num_gpus * self.minibatch_per_gpu
@@ -38,7 +53,7 @@ class FID(metric_base.MetricBase):
             for idx, images in enumerate(self._iterate_reals(minibatch_size=minibatch_size)):
                 begin = idx * minibatch_size
                 end = min(begin + minibatch_size, self.num_images)
-                activations[begin:end] = inception.run(images[:end-begin], num_gpus=num_gpus, assume_frozen=True)
+                activations[begin:end] = inception.run(_rgb(images[:end-begin]), num_gpus=num_gpus, assume_frozen=True)
                 if end == self.num_images:
                     break
             mu_real = np.mean(activations, axis=0)
@@ -54,7 +69,7 @@ class FID(metric_base.MetricBase):
                 latents = tf.random_normal([self.minibatch_per_gpu] + Gs_clone.input_shape[1:])
                 images = Gs_clone.get_output_for(latents, None, is_validation=True, randomize_noise=True)
                 images = tflib.convert_images_to_uint8(images)
-                result_expr.append(inception_clone.get_output_for(images))
+                result_expr.append(inception_clone.get_output_for(_rgb(images)))
 
         # Calculate statistics for fakes.
         for begin in range(0, self.num_images, minibatch_size):
