@@ -22,7 +22,8 @@ parser.add_argument('--mirror_augment', action='store_true', help='Enables mirro
 parser.add_argument('--max_label_size', default='0', help='max_label_size (default 0 to disable, or full from data, or integer') 
 parser.add_argument('--metrics', default='fid50k', help='metrics')
 parser.add_argument('--ckpt', default='', help='load model checkpoint to continue')
-parser.add_argument('--lod_init', type=int, default=8, help='initial LOD')
+parser.add_argument('--ckpt_freq', type=int, default=10, help='model checkpoint saving frequency')
+parser.add_argument('--resume_kimg', type=float, default=0.0, help='resumed images processed')
 args = parser.parse_args()
 def get_metrics(arg):
     d = {'fid50k': metric_base.fid50k}
@@ -72,7 +73,6 @@ if 1:
 
     # Default options.
     train.total_kimg = 25000
-    sched.lod_initial_resolution = args.lod_init
     sched.G_lrate_dict = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
     sched.D_lrate_dict = EasyDict(sched.G_lrate_dict)
 
@@ -197,10 +197,11 @@ if 0:
 # Calls the function indicated by 'train' using the selected options.
 
 def main():
-    print('debug args', train, dataset, sched, grid , metrics, tf_config, submit_config, config, desc)
+    train.network_snapshot_ticks = args.ckpt_freq
     kwargs = EasyDict(train)
     if args.ckpt:
         kwargs.update(resume_run_id=args.ckpt)
+    kwargs.update(resume_kimg=args.resume_kimg)
     kwargs.update(G_args=G, D_args=D, G_opt_args=G_opt, D_opt_args=D_opt, G_loss_args=G_loss, D_loss_args=D_loss)
     kwargs.update(dataset_args=dataset, sched_args=sched, grid_args=grid, metric_arg_list=metrics, tf_config=tf_config)
     kwargs.submit_config = copy.deepcopy(submit_config)
